@@ -3,12 +3,14 @@ extern crate iron;
 extern crate mime;
 extern crate router;
 extern crate urlencoded;
+extern crate params;
 
 use iron::prelude::*;
 use iron::status;
 use router::Router;
 use std::str::FromStr;
 use urlencoded::UrlEncodedQuery;
+/// usage : http://localhost:3000/gcd?a=12&b=5
 
 fn main() {
 
@@ -29,8 +31,8 @@ fn get_form(request: &mut Request) -> IronResult<Response> {
     response.set_mut(r#"
     <title>GCD Calculator</title>
     <form>
-        <input type="text" name="n"/>
-        <input type="text" name="n"/>
+        <input type="text" name="a"/>
+        <input type="text" name="b"/>
         <button type="submit">Compute GCD</button>
     </form>
     "#);
@@ -38,10 +40,12 @@ fn get_form(request: &mut Request) -> IronResult<Response> {
 }
 
 fn post_gcd(request: &mut Request) -> IronResult<Response> {
-    let mut response = Response::new();
+    use params::{Params, Value};
 
+    let mut response = Response::new();
+    
     let hashmap;
-    match request.get_ref::<UrlEncodedQuery>() {
+    match request.get_ref::<Params>() {
         Err(e) => {
             response.set_mut(status::BadRequest);
             response.set_mut(format!("Error parsing form data: {:?}\n", e));
@@ -52,15 +56,25 @@ fn post_gcd(request: &mut Request) -> IronResult<Response> {
         }
     }
 
-    let unparsed_numbers;
-    match hashmap.get("n") {
-        None => {
-            response.set_mut(status::BadRequest);
-            response.set_mut(format!("form data has no 'n' parameter\n"));
-            return Ok(response);
+    let mut unparsed_numbers = Vec::new();
+    match hashmap.find(&["a"]) {
+        Some(&Value::String(ref value)) => {
+            unparsed_numbers.push(value);
         }
-        Some(nums) => {
-            unparsed_numbers = nums;
+        _ => {
+            response.set_mut(status::BadRequest);
+            response.set_mut(format!("Value for 'a' parameter nota number. \n"));
+            return Ok(Response::with(iron::status::NotFound));
+        }
+    }
+    match hashmap.find(&["b"]) {
+        Some(&Value::String(ref value)) => {
+            unparsed_numbers.push(value);
+        }
+        _ => {
+            response.set_mut(status::BadRequest);
+            response.set_mut(format!("Value for 'b' parameter nota number. \n"));
+            return Ok(Response::with(iron::status::NotFound));
         }
     }
 
@@ -70,7 +84,7 @@ fn post_gcd(request: &mut Request) -> IronResult<Response> {
             Err(_) => {
                 response.set_mut(status::BadRequest);
                 response.set_mut(format!("Value for 'n' parameter nota number: {:?}\n", unparsed));
-                return Ok(response);
+                return Ok(Response::with(iron::status::NotFound));
             }
             Ok(n) => {
                 numbers.push(n);
